@@ -82,6 +82,6 @@ USE_TZ = False
 
 STATIC_URL = BASE_DIR + '/static/'
 
-TEMPLATE_DIRS = (
-	BASE_DIR + '/templates',
-)
+#TEMPLATE_DIRS = (
+#	BASE_DIR + '/templates',
+#)

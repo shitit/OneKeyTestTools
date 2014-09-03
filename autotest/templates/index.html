@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Autotest WebUI</title>
+	<link rel="stylesheet" type="text/css" href="/site_media/themes/default/easyui.css">
+	<link rel="stylesheet" type="text/css" href="/site_media/themes/icon.css">
+	<link rel="stylesheet" type="text/css" href="/site_media/themes/demo.css">
+	<script type="text/javascript" src="/site_media/js/jquery-1.7.js"></script>
+	<script type="text/javascript" src="/site_media/js/jquery.easyui.min.js"></script>
+	<script type="text/javascript" src="/site_media/js/easyui-lang-zh_CN.js"></script> 
+	<script type="text/javascript">
+	$(document).ready(function(){
+		
+	});
+	</script>
+</head>
+<body>
+	<div style="margin:10px 0;"></div>
+
+	<div id="tb" style="padding:5px;height:auto">
+		<div>
+			执行日期: <input id="starttime" class="easyui-datetimebox" style="width:150px" />
+			到: <input id="endtime" class="easyui-datetimebox" style="width:150px" />
+			执行状态: 
+			<select class="easyui-combobox" panelHeight="auto" style="width:100px" id="exec_status" data-options="editable
+:false">
+				<option value="0">未执行</option>
+				<option value="1">已执行</option>
+				<option value="2">全部</option>
+			</select>
+			<a href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-search" plain="true" onclick="search_exec()"></a>
+			<a href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-remove" plain="true" onclick="remove()"></a>
+			<a id='startApp' href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-ok" onclick="startApp()">开启</a>
+			<a id='stopApp' href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-cancel" onclick="stopApp()">结束</a>
+		</div>
+	</div>
+	
+	<table id="dg" class="easyui-datagrid" title="自动化测试列表" style="width:860px;height:400px"
+			data-options="
+				rownumbers:true,
+				singleSelect:true,
+				pagination:true,
+				url:'/',
+				toolbar:'#tb',
+				striped:true
+				">
+		<thead>
+			<tr>
+				<th data-options="field:'exec_info',width:250">执行版本</th>
+				<th data-options="field:'exec_time',width:150">请求时间</th>
+				<th data-options="
+					field:'exec_ornot',
+					width:100,
+					align:'right',
+					formatter:function(value, rowData){
+						if(value=='1')
+						{
+							return '<font color=green>已执行</font>';
+						}
+						else
+						{
+							return '<font color=red>未执行</font>';
+						}
+					}"
+					>执行状态</th>
+			</tr>
+		</thead>
+	</table>
+	<script type="text/javascript">
+		$(function(){
+			var pager = $('#dg').datagrid('getPager');	// get the pager of datagrid
+			pager.pagination({});			
+			query_status();
+		})
+
+		function query_status(){
+			$.ajax({
+				type: "POST",
+				url: "/",
+				data: {type:'3', start:'2'},
+				dataType: "json",
+				timeout: 5000,
+				success: function(msg){
+					var szStatus;
+					if (msg.ret == '1')
+					{
+						szStatus = '运行中';
+						$('#startApp').linkbutton('disable');
+						$('#stopApp').linkbutton('enable');
+					}else
+					{
+						szStatus = '已终止';
+						$('#startApp').linkbutton('enable');
+						$('#stopApp').linkbutton('disable');
+					}
+					$('#dg').datagrid({title:'自动化测试列表 (服务器状态:' + szStatus + ')'});
+				},
+				error:function(msg){					
+				}
+			});
+		}
+
+		function search_exec(){
+			var start_time = $('#starttime').datetimebox('getValue');
+			var end_time = $('#endtime').datetimebox('getValue');
+			var exec_status = $('#exec_status').combobox('getValue');
+			$.ajax({
+				type: "POST",
+				url: "/",
+				data: {start_time:start_time, end_time:end_time, exec_status:exec_status, type:'1'},
+				dataType: "json",
+				timeout: 2000,
+				success: function(msg){
+					$('#dg').datagrid('loadData', msg);
+				},
+				error:function(msg){
+					$.messager.alert('错误','数据载入有误，请重试！');
+				}
+			});
+		}
+
+		function remove(){
+			var current_row = $('#dg').datagrid('getSelected'); 
+			if (current_row != null)
+			{
+				$.messager.confirm('确定删除', '删除后将不可恢复!', function(r){
+					if(r){
+						var current_index = $('#dg').datagrid('getRowIndex', current_row);
+						$.ajax({
+							type: "POST",
+							url: "/",
+							data: {cid : current_row.cid, type: '2'},
+							dataType: "json",
+							timeout: 2000,
+							success: function(msg){
+								if(msg.ret==0)
+								{
+									$('#dg').datagrid('deleteRow', current_index);
+									$.messager.alert('成功','该待执行任务已成功被删除。');
+								}
+								else if(msg.ret==1)
+								{
+									$.messager.alert('错误','已执行任务不能删除。');
+								}
+								else
+								{
+									$.messager.alert('错误','该执行任务删除失败。');
+								}
+							},
+							error:function(msg){
+								$.messager.alert('错误','网络故障，请重试！');
+							}
+						});
+					}
+				});
+			}
+		}
+
+		function startApp()
+		{
+			$('#startApp').linkbutton('disable');
+			$('#stopApp').linkbutton('enable');
+			$.ajax({
+				type: "POST",
+				url: "/",
+				data: {type:'3', start:'1'},
+				dataType: "json",
+				timeout: 2000,
+				success: function(msg){
+					query_status();
+					$('#dg').datagrid('loadData', msg);
+				},
+				error:function(msg){
+					query_status();
+					$.messager.alert('错误','启动失败！');
+				}
+			});
+		}
+
+		function stopApp()
+		{
+			$('#startApp').linkbutton('enable');
+			$('#stopApp').linkbutton('disable');
+			$.ajax({
+				type: "POST",
+				url: "/",
+				data: {type:'3', start:'0'},
+				dataType: "json",
+				timeout: 2000,
+				success: function(msg){
+					query_status();
+					$('#dg').datagrid('loadData', msg);					
+				},
+				error:function(msg){
+					query_status();
+					$.messager.alert('错误','终结失败！');
+				}
+			});
+		}
+	</script>
+
+</body>
+</html>
