@@ -25,9 +25,10 @@
 			执行状态: 
 			<select class="easyui-combobox" panelHeight="auto" style="width:100px" id="exec_status" data-options="editable
 :false">
+				<option value="3">全部</option>
 				<option value="0">未执行</option>
 				<option value="1">已执行</option>
-				<option value="2">全部</option>
+				<option value="2">正在执行</option>
 			</select>
 			<a href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-search" plain="true" onclick="search_exec()"></a>
 			<a href="javascript:void(0);" class="easyui-linkbutton" iconCls="icon-remove" plain="true" onclick="remove()"></a>
@@ -38,7 +39,7 @@
 	
 	<table id="dg" class="easyui-datagrid" title="自动化测试列表" style="width:860px;height:400px"
 			data-options="
-				rownumbers:true,
+				rownumbers:false,
 				singleSelect:true,
 				pagination:true,
 				url:'/',
@@ -57,6 +58,10 @@
 						if(value=='1')
 						{
 							return '<font color=green>已执行</font>';
+						}
+						else if(value=='2')
+						{
+							return '<font color=red>正在执行</font>';
 						}
 						else
 						{
@@ -113,6 +118,7 @@
 				timeout: 2000,
 				success: function(msg){
 					$('#dg').datagrid('loadData', msg);
+					$('#dg').datagrid('getPager').pagination({pageNumber: 1});
 				},
 				error:function(msg){
 					$.messager.alert('错误','数据载入有误，请重试！');
@@ -143,6 +149,10 @@
 								{
 									$.messager.alert('错误','已执行任务不能删除。');
 								}
+								else if(msg.ret==3)
+								{
+									$.messager.alert('错误','正在执行任务不能删除。');
+								}
 								else
 								{
 									$.messager.alert('错误','该执行任务删除失败。');
@@ -169,7 +179,6 @@
 				timeout: 2000,
 				success: function(msg){
 					query_status();
-					$('#dg').datagrid('loadData', msg);
 				},
 				error:function(msg){
 					query_status();
@@ -189,8 +198,7 @@
 				dataType: "json",
 				timeout: 2000,
 				success: function(msg){
-					query_status();
-					$('#dg').datagrid('loadData', msg);					
+					query_status();			
 				},
 				error:function(msg){
 					query_status();

@@ -6,6 +6,9 @@ from datetime import datetime
 import OnekeyTest.settings
 from os import sep as os_sep
 import win32api
+from django.core.paginator import Paginator
+from django.core.paginator import PageNotAnInteger
+from django.core.paginator import EmptyPage
 
 # Create your views here.
 def main(request):
@@ -30,23 +33,31 @@ def main(request):
 			start_time = request.POST.get('start_time', '')
 			end_time = request.POST.get('end_time', '')
 			exec_status = request.POST.get('exec_status', '')
-			q = None
-			if exec_status != '2':
-				q = TestQueue.objects.filter(exec_ornot=exec_status)
+			_q = None
+			if exec_status != '3':
+				_q = TestQueue.objects.order_by('-exec_time').filter(exec_ornot=exec_status)
 			else:
-				q = TestQueue.objects.all()
+				_q = TestQueue.objects.order_by('-exec_time').all()
 			if start_time != '':
 				try:
-					q = q.filter(exec_time__gte=datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S'))
+					_q = _q.filter(exec_time__gte=datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S'))
 				except:
 					pass
 			if end_time != '':
 				try:
-					q = q.filter(exec_time__lte=datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S'))
+					_q = _q.filter(exec_time__lte=datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S'))
 				except:
 					pass
-			info_dict['total'] = q.count()
-			info_dict['rows'] = [ {'cid':item.id, 'exec_info':item.exec_info, 'exec_time':item.exec_time.strftime('%Y-%m-%d %H:%M:%S'), 'exec_ornot':item.exec_ornot} for item in q[(page-1)*rows:page*rows] ]
+
+			info_dict['total'] = _q.count()
+			paginator = Paginator(_q, rows)
+			try:
+				_q = paginator.page(page)
+			except PageNotAnInteger:
+				_q = paginator.page(1)
+			except EmptyPage:
+				_q = paginator.page(paginator.num_pages)
+			info_dict['rows'] = [ {'cid':item.id, 'exec_info':item.exec_info, 'exec_time':item.exec_time.strftime('%Y-%m-%d %H:%M:%S'), 'exec_ornot':item.exec_ornot} for item in _q ]
 			out = dumps(info_dict)
 			return HttpResponse(out)
 
@@ -54,8 +65,11 @@ def main(request):
 		elif i_type == '2':
 			cid = request.POST.get('cid', '')
 			try:
-				if TestQueue.objects.filter(id=cid)[0].exec_ornot==1:
+				ret = TestQueue.objects.filter(id=cid)[0].exec_ornot
+				if ret==1:
 					out = dumps({'ret':'1'})
+				elif ret==2:
+					out = dumps({'ret':'3'})
 				else:
 					TestQueue.objects.filter(id=cid).delete()
 					out = dumps({'ret':'0'})
@@ -99,7 +113,15 @@ def main(request):
 		# return total and pager
 		otest = TestQueue.objects
 		info_dict['total'] = otest.count()
-		info_dict['rows'] = [ {'cid':item.id, 'exec_info':item.exec_info, 'exec_time':item.exec_time.strftime('%Y-%m-%d %H:%M:%S'), 'exec_ornot':item.exec_ornot} for item in otest.order_by('-exec_time').all()[(page-1)*rows:page*rows] ]
+		q = otest.order_by('-exec_time').all()
+		paginator = Paginator(q, rows)
+		try:
+			q = paginator.page(page)
+		except PageNotAnInteger:
+			q = paginator.page(1)
+		except EmptyPage:
+			q = paginator.page(paginator.num_pages)
+		info_dict['rows'] = [ {'cid':item.id, 'exec_info':item.exec_info, 'exec_time':item.exec_time.strftime('%Y-%m-%d %H:%M:%S'), 'exec_ornot':item.exec_ornot} for item in q ]
 		out = dumps(info_dict)
 		return HttpResponse(out)
 	return render_to_response('index.html')

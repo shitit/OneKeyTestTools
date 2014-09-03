@@ -193,23 +193,32 @@ class TestExec:
 	def out_queue(self):
 		ts = session.query(TestQueue).filter(TestQueue.exec_ornot==0).order_by(TestQueue.exec_time).first()
 		if ts!=None:
-			ts.exec_ornot = 1
+			ts.exec_ornot = 2
 			session.commit()
-			return ts.exec_info
+			return (ts.exec_info, ts.id)
 		else:
 			return None
 
 	def comsume_handle(self):
+		running_db_id = 0
 		while 1:
 			# check configure setting
 			try:
 				if self.checkConfig():
 					# query whether to execute or not
 					if not self.bExecuting(self.checktest):
+						# update the old running pid status in db
+						if running_db_id != 0:
+							oid_obj = session.query(TestQueue).filter(TestQueue.id==running_db_id).first()
+							if oid_obj != None:
+								oid_obj.exec_ornot = 1
+								session.commit()
 						# pop queue
 						r_acBuild = self.out_queue()
 						if r_acBuild != None:
-							self.set_config(r_acBuild)
+							# set the running id in db
+							running_db_id = r_acBuild[1]
+							self.set_config(r_acBuild[0])
 							self.execute_autotest()
 			except Exception, ex:
 				print ex
